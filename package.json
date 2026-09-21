@@ -5,7 +5,10 @@
   "main": "library.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dangeruss/nodebb-plugin-affiliate"
+    "url": "https://github.com/dangerusslee/nodebb-plugin-affiliate"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
   },
   "keywords": [
     "nodebb",
