@@ -540,9 +540,10 @@
                 element.href = "https://" + trackingServerDomain + "/links/" + websiteId + "/type/am" + extraParams +
                     "/" + url;
                 element.setAttribute('data-affiliate-monetized', 'true');
-            } else if (amazon_enabled && domainInLowerCase.indexOf("amazon.com") !== -1) {
+            } else if (amazon_enabled && /(?:^|\.)(?:amazon\.com|a\.co|amzn\.to|amzn\.com)$/i.test(domainInLowerCase)) {
                 var u = new Url(url);
                 log(u);
+                u.protocol = 'https';
                 u.query["tag"] = amazon_tag;
                 element.href = u.toString();
                 element.setAttribute('data-affiliate-monetized', 'true');

@@ -66,7 +66,8 @@ plugin.processPost = function(data, callback) {
 			target = null;
 		}
 
-		if (target && target.host && target.host.toLowerCase().indexOf("amazon.com") !== -1) {
+		if (target && target.host && /(?:^|\.)(?:amazon\.com|a\.co|amzn\.to|amzn\.com)$/i.test(target.host)) {
+			target.protocol = 'https:';
 			delete target.search;
 			target.query = target.query || {};
 			target.query["tag"] = "phtwllt-20";

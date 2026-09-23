@@ -110,8 +110,9 @@ function mockAutoMonetize(element, options) {
         return;
     }
 
-    if (domainInLowerCase.indexOf('amazon.com') !== -1) {
+    if (/(?:^|\.)(?:amazon\.com|a\.co|amzn\.to|amzn\.com)$/i.test(domainInLowerCase)) {
         var u = new Url(url);
+        u.protocol = 'https';
         u.query['tag'] = 'phtwllt-20';
         element.href = u.toString();
         element.setAttribute('data-affiliate-monetized', 'true');
@@ -311,6 +312,18 @@ describe('Client-side autoMonetize rules', () => {
         assert.strictEqual(el.getAttribute('data-affiliate-monetized'), 'true');
     });
 
+    it('rewrites Amazon shortlinks (a.co and amzn.to) with tag=phtwllt-20 and enforces https', () => {
+        const acoEl = createMockElement('http://a.co/d/0iKHm6Jo');
+        mockAutoMonetize(acoEl);
+        assert.strictEqual(acoEl.href, 'https://a.co/d/0iKHm6Jo?tag=phtwllt-20');
+        assert.strictEqual(acoEl.getAttribute('data-affiliate-monetized'), 'true');
+
+        const amznEl = createMockElement('https://amzn.to/3example');
+        mockAutoMonetize(amznEl);
+        assert.strictEqual(amznEl.href, 'https://amzn.to/3example?tag=phtwllt-20');
+        assert.strictEqual(amznEl.getAttribute('data-affiliate-monetized'), 'true');
+    });
+
     it('rewrites Target link cleanly to goto.target.com with u parameter', () => {
         const el = createMockElement('https://www.target.com/p/apple-airpods-pro/-/A-80183742');
         mockAutoMonetize(el);
@@ -506,6 +519,22 @@ describe('Server-side processPost (library.js)', () => {
             const content = result.postData.content;
             assert.ok(content.includes('https://www.amazon.com/dp/B001?tag=phtwllt-20'));
             assert.ok(content.includes('https://www.amazon.com/dp/B002?foo=bar&tag=phtwllt-20'));
+            done();
+        });
+    });
+
+    it('tags Amazon mobile shortlinks (a.co and amzn.to) and upgrades to https', (t, done) => {
+        const data = {
+            postData: {
+                content: '<p>Check out <a href="http://a.co/d/0iKHm6Jo">Phone Deal</a> and <a href="https://amzn.to/3example?ref=share">Other Deal</a></p>'
+            }
+        };
+
+        plugin.processPost(data, (err, result) => {
+            assert.ifError(err);
+            const content = result.postData.content;
+            assert.ok(content.includes('https://a.co/d/0iKHm6Jo?tag=phtwllt-20'));
+            assert.ok(content.includes('https://amzn.to/3example?ref=share&tag=phtwllt-20'));
             done();
         });
     });
