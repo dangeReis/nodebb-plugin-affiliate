@@ -599,3 +599,90 @@ describe('Server-side processPost (library.js)', () => {
         });
     });
 });
+
+describe('Client-side Prime perk tip (main.js)', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const mainCode = fs.readFileSync(path.join(__dirname, '../static/lib/main.js'), 'utf8');
+
+    it('attaches subtle Prime perk tip to posts with Amazon links', () => {
+        let appendedHtml = '';
+        const mockElement = {
+            attr: (name) => name === 'href' ? 'https://www.amazon.com/dp/B0012345?tag=phtwllt-20' : null
+        };
+
+        const mockPost = {
+            find: (selector) => {
+                if (selector === '.pw-prime-tip') return { length: 0 };
+                if (selector === 'a[href]') {
+                    return {
+                        each: (cb) => { cb.call(mockElement); }
+                    };
+                }
+                return { length: 0 };
+            },
+            append: (html) => { appendedHtml = html; }
+        };
+
+        const windowMock = {
+            handlers: {},
+            on: function(evt, h) { this.handlers[evt] = h; },
+            trigger: function(evt, data) { if (this.handlers[evt]) this.handlers[evt]({}, data); }
+        };
+
+        const mock$ = function(selector) {
+            if (selector === windowMock) return windowMock;
+            if (selector === mockElement) return mockElement;
+            if (selector === mockPost) return mockPost;
+            if (selector === '[component="post/content"]') {
+                return {
+                    each: (cb) => { cb.call(mockPost); }
+                };
+            }
+            return { on: () => {} };
+        };
+
+        const fn = new Function('$', 'window', 'ajaxify', 'config', mainCode);
+        fn(mock$, windowMock, { data: { template: { name: 'topic' } } }, { affiliate: { bounty_tag: 'phtwllt-bounty-20' } });
+
+        windowMock.trigger('action:ajaxify.end', { tpl_url: 'topic' });
+
+        assert.ok(appendedHtml.includes('class="pw-prime-tip text-muted"'));
+        assert.ok(appendedHtml.includes('tag=phtwllt-bounty-20'));
+        assert.ok(appendedHtml.includes('30-day Free Trial'));
+        assert.ok(appendedHtml.includes('6 Months Free (18–24 &amp; Students)'));
+    });
+
+    it('does not attach tip if post already has .pw-prime-tip', () => {
+        let appended = false;
+        const mockPost = {
+            find: (selector) => {
+                if (selector === '.pw-prime-tip') return { length: 1 };
+                return { length: 0 };
+            },
+            append: () => { appended = true; }
+        };
+
+        const windowMock = {
+            handlers: {},
+            on: function(evt, h) { this.handlers[evt] = h; },
+            trigger: function(evt, data) { if (this.handlers[evt]) this.handlers[evt]({}, data); }
+        };
+
+        const mock$ = function(selector) {
+            if (selector === windowMock) return windowMock;
+            if (selector === mockPost) return mockPost;
+            if (selector === '[component="post/content"]') {
+                return { each: (cb) => { cb.call(mockPost); } };
+            }
+            return { on: () => {} };
+        };
+
+        const fn = new Function('$', 'window', 'ajaxify', 'config', mainCode);
+        fn(mock$, windowMock, { data: { template: { name: 'topic' } } }, {});
+
+        windowMock.trigger('action:ajaxify.end', { tpl_url: 'topic' });
+        assert.strictEqual(appended, false);
+    });
+});
+
