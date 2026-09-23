@@ -98,7 +98,7 @@ function mockAutoMonetize(element, options) {
         return;
     }
 
-    var domainInLowerCase = domainAndProtocol.domain.toLowerCase();
+    var domainInLowerCase = domainAndProtocol.domain.toLowerCase().split(':')[0];
 
     // Already monetized domains
     if (domainInLowerCase.indexOf('goto.target.com') !== -1 ||
@@ -322,6 +322,11 @@ describe('Client-side autoMonetize rules', () => {
         mockAutoMonetize(amznEl);
         assert.strictEqual(amznEl.href, 'https://amzn.to/3example?tag=phtwllt-20');
         assert.strictEqual(amznEl.getAttribute('data-affiliate-monetized'), 'true');
+
+        const portEl = createMockElement('https://www.amazon.com:443/dp/B08N5WRWNW');
+        mockAutoMonetize(portEl);
+        assert.strictEqual(portEl.href, 'https://www.amazon.com/dp/B08N5WRWNW?tag=phtwllt-20');
+        assert.strictEqual(portEl.getAttribute('data-affiliate-monetized'), 'true');
     });
 
     it('rewrites Target link cleanly to goto.target.com with u parameter', () => {
@@ -535,6 +540,21 @@ describe('Server-side processPost (library.js)', () => {
             const content = result.postData.content;
             assert.ok(content.includes('https://a.co/d/0iKHm6Jo?tag=phtwllt-20'));
             assert.ok(content.includes('https://amzn.to/3example?ref=share&tag=phtwllt-20'));
+            done();
+        });
+    });
+
+    it('handles Amazon links with explicit port numbers', (t, done) => {
+        const data = {
+            postData: {
+                content: '<p><a href="https://www.amazon.com:443/dp/B0012345">Port Link</a></p>'
+            }
+        };
+
+        plugin.processPost(data, (err, result) => {
+            assert.ifError(err);
+            const content = result.postData.content;
+            assert.ok(content.includes('tag=phtwllt-20'));
             done();
         });
     });

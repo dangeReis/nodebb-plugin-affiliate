@@ -506,7 +506,7 @@
                 return;
             }
 
-            var domainInLowerCase = domainAndProtocol.domain.toLowerCase();
+            var domainInLowerCase = domainAndProtocol.domain.toLowerCase().split(':')[0];
 
             // Check if already an affiliate link from one of our networks
             if (domainInLowerCase.indexOf("goto.target.com") !== -1 ||

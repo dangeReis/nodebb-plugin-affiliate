@@ -66,7 +66,8 @@ plugin.processPost = function(data, callback) {
 			target = null;
 		}
 
-		if (target && target.host && /(?:^|\.)(?:amazon\.com|a\.co|amzn\.to|amzn\.com)$/i.test(target.host)) {
+		var hostname = target && (target.hostname || (target.host ? target.host.split(':')[0] : ''));
+		if (target && hostname && /(?:^|\.)(?:amazon\.com|a\.co|amzn\.to|amzn\.com)$/i.test(hostname)) {
 			target.protocol = 'https:';
 			delete target.search;
 			target.query = target.query || {};
