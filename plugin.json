@@ -25,8 +25,8 @@
 	],
 	"scripts": [
 		"static/lib/main.js",
-		"static/lib/cj.js",
-		"static/lib/url.js"
+		"static/lib/url.js",
+		"static/lib/cj.js"
 	],
 	"acpScripts": [
 		"static/lib/admin.js"

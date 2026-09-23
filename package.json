@@ -5,7 +5,10 @@
   "main": "library.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dangeruss/nodebb-plugin-affiliate"
+    "url": "https://github.com/dangerusslee/nodebb-plugin-affiliate"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
   },
   "keywords": [
     "nodebb",
@@ -22,7 +25,10 @@
     "url": "https://github.com/dangeruss/nodebb-plugin-affiliate/issues"
   },
   "readmeFilename": "README.md",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "nbbpm": {
-    "compatibility": "^1.6.0"
+    "compatibility": "^1.6.0 || ^2.0.0 || ^3.0.0 || ^4.0.0"
   }
 }

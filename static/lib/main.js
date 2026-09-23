@@ -1,20 +1,50 @@
 "use strict";
 
+(function() {
+	function addPrimeTips() {
+		if (typeof ajaxify === 'undefined' || !ajaxify.data || !ajaxify.data.template || ajaxify.data.template.name !== 'topic') {
+			return;
+		}
 
-$(document).ready(function() {
-	
-	/*
-		This file shows how client-side javascript can be included via a plugin.
-		If you check `plugin.json`, you'll see that this file is listed under "scripts".
-		That array tells NodeBB which files to bundle into the minified javascript
-		that is served to the end user.
+		$('[component="post/content"]').each(function() {
+			var $content = $(this);
+			if ($content.find('.pw-prime-tip').length) {
+				return;
+			}
 
-		Some events you can elect to listen for:
+			var hasAmazonLink = false;
+			$content.find('a[href]').each(function() {
+				var href = $(this).attr('href') || '';
+				if (/(?:^|\.)(?:amazon\.com|a\.co|amzn\.to|amzn\.com)(?:\/|$)/i.test(href)) {
+					// Do not add tip if link is already for prime/sub trial signup
+					if (!/joinyoungadult|amazon\.com\/prime|qualify/i.test(href)) {
+						hasAmazonLink = true;
+						return false;
+					}
+				}
+			});
 
-		$(document).ready();			Fired when the DOM is ready
-		$(window).on('action:ajaxify.end', function(data) { ... });			"data" contains "url"
-	*/
+			if (hasAmazonLink) {
+				var bountyTag = (typeof config !== 'undefined' && config.affiliate && config.affiliate.bounty_tag) ||
+					(typeof config !== 'undefined' && config.affiliate && config.affiliate.amazon_tag) ||
+					'phtwllt-20';
+				var tipHtml = '<div class="pw-prime-tip text-muted">' +
+					'<i class="fa fa-truck text-muted" aria-hidden="true"></i> <strong>Prime perks:</strong> Need free shipping? Try a ' +
+					'<a href="https://www.amazon.com/prime?tag=' + encodeURIComponent(bountyTag) + '" target="_blank" rel="nofollow noopener">30-day Free Trial</a> or ' +
+					'<a href="https://www.amazon.com/joinyoungadult?tag=' + encodeURIComponent(bountyTag) + '" target="_blank" rel="nofollow noopener">6 Months Free (18–24 &amp; Students)</a>.' +
+					'</div>';
+				$content.append(tipHtml);
+			}
+		});
+	}
 
-	console.log('nodebb-plugin-affiliate: loaded');
-	// Note how this is shown in the console on the first load of every page
-});
+	$(window).on('action:ajaxify.end', function(ev, data) {
+		if (data && data.tpl_url === 'topic') {
+			addPrimeTips();
+		}
+	});
+
+	$(window).on('action:posts.loaded', function() {
+		addPrimeTips();
+	});
+})();

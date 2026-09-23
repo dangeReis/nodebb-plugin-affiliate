@@ -9,7 +9,11 @@
 			<h3>Amazon</h3>
 			<div class="form-group">
 				<label for="setting-1">Amazon Tag</label>
-				<input type="text" id="amazon-tag" name="amazon_tag" title="Amazon Tag" class="form-control" placeholder="sometag-20">
+				<input type="text" id="amazon-tag" name="amazon_tag" title="Amazon Tag" class="form-control" placeholder="phtwllt-20">
+			</div>
+			<div class="form-group">
+				<label for="bounty-tag">Amazon Bounty Tag (Prime Perk Links)</label>
+				<input type="text" id="bounty-tag" name="bounty_tag" title="Amazon Bounty Tag" class="form-control" placeholder="phtwllt-20">
 			</div>
 			<hr/>
 			<h3>Commission Junction</h3>
