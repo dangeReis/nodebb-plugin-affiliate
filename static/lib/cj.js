@@ -437,20 +437,97 @@
             return false
         }
 
-        function autoMonetizeLink(element) {
-            var start = new Date().getTime();
-            var url = element.href;
-            var domainAndProtocol = getDomainAndProtocol(url);
-            if (!domainAndProtocol.domain)
-                return;
+        function cleanUrl(rawUrl) {
+            if (!rawUrl || typeof rawUrl !== 'string') {
+                return '';
+            }
+            var url = rawUrl.trim();
 
-            var domainInLowerCase = domainAndProtocol.domain.toLowerCase();
+            // Decode common escaped entities / encodings in quotes
+            url = url.replace(/&quot;/gi, '"')
+                     .replace(/&#34;/g, '"')
+                     .replace(/&#39;/g, "'")
+                     .replace(/&amp;/gi, '&');
+
+            // Strip leading and trailing quotes, backslashes, percent-encoded quotes
+            url = url.replace(/^(?:\\*["'`\s]|%5C%22|%22|%27)+|(?:\\*["'`\s]|%5C%22|%22|%27)+$/gi, '');
+
+            // If browser turned an unquoted/malformed scheme into a relative URL on current domain:
+            // e.g. https://phatwalletforums.com/topic/24452/.../\"https://goto.target.com/...
+            // or /topic/24452/.../%5C%22https://goto.target.com/...
+            var embeddedMatch = url.match(/(?:\/|%5C%22|%22|\\\"|\\|\")(https?:\/\/[^\s"'<>]+)$/i);
+            if (embeddedMatch) {
+                url = embeddedMatch[1];
+            } else {
+                var httpIdx = url.search(/https?:\/\//i);
+                if (httpIdx > 0) {
+                    var prefix = url.substring(0, httpIdx);
+                    // Only unwrap if prefix does not look like query params (?u= or &url=)
+                    if (prefix.indexOf('?') === -1 && prefix.indexOf('&') === -1) {
+                        url = url.substring(httpIdx);
+                    }
+                }
+            }
+
+            // Strip any remaining quotes or backslashes
+            url = url.replace(/^(?:\\*["'`\s]|%5C%22|%22|%27)+|(?:\\*["'`\s]|%5C%22|%22|%27)+$/gi, '');
+
+            return url;
+        }
+
+        function autoMonetizeLink(element) {
+            if (!element || element.nodeType !== 1) {
+                return;
+            }
+            if (element.getAttribute('data-affiliate-monetized') === 'true') {
+                return;
+            }
+
+            var start = new Date().getTime();
+            var rawHref = element.getAttribute('href') || element.href || '';
+            var url = cleanUrl(rawHref);
+            if (!url && element.href) {
+                url = cleanUrl(element.href);
+            }
+
+            if (!url || !/^https?:\/\//i.test(url)) {
+                element.setAttribute('data-affiliate-monetized', 'true');
+                return;
+            }
+
+            // If the raw href was corrupted (e.g. had stray quotes or was made relative by browser), fix the element immediately
+            if (element.getAttribute('href') !== url) {
+                element.href = url;
+            }
+
+            var domainAndProtocol = getDomainAndProtocol(url);
+            if (!domainAndProtocol || !domainAndProtocol.domain) {
+                element.setAttribute('data-affiliate-monetized', 'true');
+                return;
+            }
+
+            var domainInLowerCase = domainAndProtocol.domain.toLowerCase().split(':')[0];
+
+            // Check if already an affiliate link from one of our networks
+            if (domainInLowerCase.indexOf("goto.target.com") !== -1 ||
+                domainInLowerCase.indexOf("adorama.evyy.net") !== -1 ||
+                domainInLowerCase.indexOf("linksynergy.walmart.com") !== -1 ||
+                domainInLowerCase.indexOf("rover.ebay.com") !== -1 ||
+                domainInLowerCase.indexOf(trackingServerDomain) !== -1 ||
+                domainInLowerCase.indexOf("click.linksynergy.com") !== -1 ||
+                domainInLowerCase.indexOf("tracking.groupon.com") !== -1 ||
+                domainInLowerCase.indexOf("partner.groupon.com") !== -1) {
+                element.setAttribute('data-affiliate-monetized', 'true');
+                return;
+            }
+
             var hashIndex = url.indexOf('#');
             var frag = "";
             if (hashIndex > -1) {
                 frag = url.substring(hashIndex + 1);
                 url = url.substring(0, hashIndex);
             }
+
             if (cj_enabled && (domains.indexOf(domainInLowerCase) >= 0 || matchesParentDomain(domainInLowerCase))) {
                 log("Domain found in list. Automonetizing...");
                 var extraParams = "";
@@ -460,77 +537,89 @@
                 if (frag) {
                     extraParams = extraParams + "/fragment/" + encodeURIComponent(frag);
                 }
-                element.href = "//" + trackingServerDomain + "/links/" + websiteId + "/type/am" + extraParams +
+                element.href = "https://" + trackingServerDomain + "/links/" + websiteId + "/type/am" + extraParams +
                     "/" + url;
-            } else if (amazon_enabled && domainInLowerCase.indexOf("amazon.com") !== -1) {
+                element.setAttribute('data-affiliate-monetized', 'true');
+            } else if (amazon_enabled && /(?:^|\.)(?:amazon\.com|a\.co|amzn\.to|amzn\.com)$/i.test(domainInLowerCase)) {
                 var u = new Url(url);
                 log(u);
+                u.protocol = 'https';
                 u.query["tag"] = amazon_tag;
-                element.href = u;
+                element.href = u.toString();
+                element.setAttribute('data-affiliate-monetized', 'true');
             } else if (ebay_enabled && domainInLowerCase.indexOf("ebay.com") !== -1 && domainInLowerCase.indexOf(
                 "rover.ebay.com") == -1) {
-                var u = new Url("https://rover.ebay.com/rover/1/711-53200-19255-0/1?ff3=4&toolid=11800")
+                var u = new Url("https://rover.ebay.com/rover/1/711-53200-19255-0/1?ff3=4&toolid=11800");
                 //pub=5575178708&campid=5338188580&mpre=");
                 u.query["pub"] = epn_pub;
                 u.query["campid"] = epn_campaign;
                 u.query["mpre"] = url;
-                element.href = u;
+                element.href = u.toString();
+                element.setAttribute('data-affiliate-monetized', 'true');
             } else if (ir_enabled && domainInLowerCase.indexOf("target.com") !== -1 && domainInLowerCase.indexOf(
                     "goto.target.com") == -1) {
-                var u = new Url("http://goto.target.com/c/437216/81938/2092");
+                var u = new Url("https://goto.target.com/c/437216/81938/2092");
                 u.query["u"] = url;
                 log(url);
-                element.href = u;
+                element.href = u.toString();
+                element.setAttribute('data-affiliate-monetized', 'true');
             } else if (ir_enabled && domainInLowerCase.indexOf("adorama.com") !== -1 && domainInLowerCase.indexOf(
                 "adorama.evyy.net") == -1) {
-                var u = new Url("http://adorama.evyy.net/c/437216/51926/1036");
+                var u = new Url("https://adorama.evyy.net/c/437216/51926/1036");
                 u.query["u"] = url;
                 log(url);
-                element.href = u;
-             } else if (ls_enabled && domainInLowerCase.indexOf("walmart.com") !== -1 && domainInLowerCase.indexOf(
-                "linksynergy.walmart.com") == -1) {
-                var u = new Url("http://linksynergy.walmart.com/fs-bin/click?subid=0&type=10&tmpid=1082");
+                element.href = u.toString();
+                element.setAttribute('data-affiliate-monetized', 'true');
+            } else if (ls_enabled && domainInLowerCase.indexOf("walmart.com") !== -1 && domainInLowerCase.indexOf(
+                "linksynergy.walmart.com") == -1 && domainInLowerCase.indexOf("click.linksynergy.com") == -1) {
+                var u = new Url("https://linksynergy.walmart.com/fs-bin/click?subid=0&type=10&tmpid=1082");
                 u.query["RD_PARM1"] = url;
-                u.query["id"]=ls_id;
-                u.query["offerid"]=wm_offerid;
+                u.query["id"] = ls_id;
+                u.query["offerid"] = wm_offerid;
                 log(url);
-                element.href = u;
-            } else if (ls_enabled && domainInLowerCase.indexOf("jackrabbit.com") !== -1) {
-                var u = new Url("https://click.linksynergy.com/deeplink?id=R*/doq1oWeQ");
+                element.href = u.toString();
+                element.setAttribute('data-affiliate-monetized', 'true');
+            } else if (ls_enabled && domainInLowerCase.indexOf("jackrabbit.com") !== -1 && domainInLowerCase.indexOf("click.linksynergy.com") == -1) {
+                var u = new Url("https://click.linksynergy.com/deeplink?id=" + encodeURIComponent(ls_id));
                 u.query["murl"] = url;
-                u.query["mid"]=40451;
+                u.query["mid"] = 40451;
                 log(url);
-                element.href = u;
-            } else if (ls_enabled && domainInLowerCase.indexOf("bestbuy.com") !== -1) {
-                var u = new Url("http://click.linksynergy.com//fs-bin/click?subid=0&type=10&tmpid=13127");
+                element.href = u.toString();
+                element.setAttribute('data-affiliate-monetized', 'true');
+            } else if (ls_enabled && domainInLowerCase.indexOf("bestbuy.com") !== -1 && domainInLowerCase.indexOf("click.linksynergy.com") == -1) {
+                var u = new Url("https://click.linksynergy.com/fs-bin/click?subid=0&type=10&tmpid=13127");
                 u.query["RD_PARM1"] = url;
-                u.query["id"]=ls_id;
-                u.query["offerid"]=bb_offerid;
+                u.query["id"] = ls_id;
+                u.query["offerid"] = bb_offerid;
                 log(url);
-                element.href = u;
-            } else if (ls_enabled && domainInLowerCase.indexOf("samsclub.com") !== -1) {
-                var u = new Url("http://click.linksynergy.com//fs-bin/click?subid=0&type=10&tmpid=13344");
+                element.href = u.toString();
+                element.setAttribute('data-affiliate-monetized', 'true');
+            } else if (ls_enabled && domainInLowerCase.indexOf("samsclub.com") !== -1 && domainInLowerCase.indexOf("click.linksynergy.com") == -1) {
+                var u = new Url("https://click.linksynergy.com/fs-bin/click?subid=0&type=10&tmpid=13344");
                 u.query["RD_PARM1"] = url;
-                u.query["id"]=ls_id;
-                u.query["offerid"]=sc_offerid;
+                u.query["id"] = ls_id;
+                u.query["offerid"] = sc_offerid;
                 log(url);
-                element.href = u; 
-            } else if (ls_enabled && domainInLowerCase.indexOf("petsmart.com") !== -1) {
-                var u = new Url("http://click.linksynergy.com//fs-bin/click?subid=0&type=10&tmpid=5690");
+                element.href = u.toString();
+                element.setAttribute('data-affiliate-monetized', 'true');
+            } else if (ls_enabled && domainInLowerCase.indexOf("petsmart.com") !== -1 && domainInLowerCase.indexOf("click.linksynergy.com") == -1) {
+                var u = new Url("https://click.linksynergy.com/fs-bin/click?subid=0&type=10&tmpid=5690");
                 u.query["RD_PARM1"] = url;
-                u.query["id"]=ls_id;
-                u.query["offerid"]=ps_offerid;
+                u.query["id"] = ls_id;
+                u.query["offerid"] = ps_offerid;
                 log(url);
-                element.href = u; 
-            } else if (ls_enabled && domainInLowerCase.indexOf("jet.com") !== -1) {
-                var u = new Url("http://click.linksynergy.com//fs-bin/click?subid=0&type=10&tmpid=20265");
+                element.href = u.toString();
+                element.setAttribute('data-affiliate-monetized', 'true');
+            } else if (ls_enabled && domainInLowerCase.indexOf("jet.com") !== -1 && domainInLowerCase.indexOf("click.linksynergy.com") == -1) {
+                var u = new Url("https://click.linksynergy.com/fs-bin/click?subid=0&type=10&tmpid=20265");
                 u.query["RD_PARM1"] = url;
-                u.query["id"]=ls_id;
-                u.query["offerid"]=ps_offerid;
+                u.query["id"] = ls_id;
+                u.query["offerid"] = jt_offerid;
                 log(url);
-                element.href = u;                 
+                element.href = u.toString();
+                element.setAttribute('data-affiliate-monetized', 'true');
             } else if (gp_enabled && domainInLowerCase.indexOf("groupon.com") !== -1 && domainInLowerCase.indexOf(
-            "tracking.groupon.com") == -1) {  
+            "tracking.groupon.com") == -1 && domainInLowerCase.indexOf("partner.groupon.com") == -1) {  
                 $.ajax({
                     type: "GET",
                     url:  gpnBaseURL+"/bookmarklet/v1/create/campaign",
@@ -539,23 +628,27 @@
                     jsonpCallback : "jsonpCallback",
                     contentType : "application/json",
                     success: function(data) {
-                        if(data.errors.length != 0) {
-                          log("Unable to generate partner link for this deal");
-                        }
-                        else {
-                            var u=$($.parseHTML(decodeEntities(data.sniplet))).filter("a").attr("href");
-                            log(u);
-                            element.href = u;
+                        if (data && data.errors && data.errors.length != 0) {
+                            log("Unable to generate partner link for this deal");
+                        } else if (data && data.sniplet) {
+                            var u = $($.parseHTML(decodeEntities(data.sniplet))).filter("a").attr("href");
+                            if (u) {
+                                log(u);
+                                element.href = u;
+                                element.setAttribute('data-affiliate-monetized', 'true');
+                            }
                         }
                     },
                     error: function() {
                       console.log("Unable to generate partner link for this deal");
                     },
-                  complete : function() {
+                    complete : function() {
+                      element.setAttribute('data-affiliate-monetized', 'true');
                       console.log("done");
-                  }
+                    }
                   });
             } else {
+                element.setAttribute('data-affiliate-monetized', 'true');
                 log("Domain not found in list. ");
             }
 
